@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -80,15 +81,15 @@
         
         .download-btn {
             position: absolute;
-            top: 20px;
+            top: 15px;
             right: 20px;
             background: #3b82f6;
             color: white;
             border: none;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
             transition: background 0.2s;
             z-index: 10;
@@ -199,7 +200,7 @@
             <div class="chart-card tall">
                 <button class="download-btn" onclick="downloadChart('chart4', 'sentiment-density.png')">Save plot</button>
                 <div class="chart-title">Insight: Emotional Tone (Sentiment Density)</div>
-                <div class="chart-subtitle">VADER sentiment distribution with median lines (scroll to zoom, drag to pan)</div>
+                <div class="chart-subtitle"><a href="https://pypi.org/project/vaderSentiment/">VADER</a> sentiment distribution with median lines (scroll to zoom, drag to pan)</div>
                 <canvas id="chart4"></canvas>
             </div>
         </div>
@@ -217,6 +218,69 @@
                     <strong>Brushing & Linking:</strong> Click on the "Model Feature Importance" bars to automatically update the "Feature Distribution" chart to explore that specific feature.
                 </div>
             </div>
+        </div>
+
+        <div class="card">
+            <h2>Data Quality Insights</h2>
+            
+            <div style="height: 250px; margin-bottom: 30px; position: relative;">
+                <button class="download-btn" style="top: -10px;" onclick="downloadChart('duplicationChart', 'duplication-analysis.png')">Save plot</button>
+                <canvas id="duplicationChart"></canvas>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                <div>
+                    <h3 style="color: #1e293b; margin-bottom: 12px;">1. Which insight did you identify regarding data quality?</h3>
+                    <p style="color: #475569; line-height: 1.6; margin: 0; font-size: 14px;">
+                        During the profiling stage, I identified a significant disparity in data redundancy. While <strong style="color: #0072b2;">Real News is relatively clean</strong>, the <strong style="color: #CC0000;">Fake News dataset is highly repetitive</strong>, containing <strong>46.7% duplicate entries</strong> (compared to only <strong>5.3% in Real News</strong>).
+                        <br><br>
+                        This suggests that Fake News sources often "recycle" content across platforms to create an echo chamber effect and artificially inflate credibility.
+                    </p>
+                </div>
+
+                <div>
+                    <h3 style="color: #1e293b; margin-bottom: 12px;">2. Why does this visualization best explain the issue?</h3>
+                    <p style="color: #475569; line-height: 1.6; margin: 0; font-size: 14px;">
+                        I selected a <strong>Stacked Horizontal Bar Chart</strong> because it allows for a direct comparison of composition rather than just raw volume. Since the total sample counts differ, a normalized 100% view highlights the proportion of wasted data.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Data Source & Methodology</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                <div>https
+                    <h3 style="color: #1e293b; margin-bottom: 12px;">1. <a href="https://www.kaggle.com/datasets/csmalarkodi/isot-fake-news-dataset">The ISOT Dataset</a></h3>
+                    <p style="color: #475569; line-height: 1.6; margin: 0; font-size: 14px;">
+                        This analysis utilizes the <strong>ISOT Fake News Dataset</strong> (University of Victoria), comprising approximately 45,000 articles split between <code>Fake.csv</code> and <code>True.csv</code>.
+                        <br><br>
+                        Rather than fact-checking individual claims, this project focuses on <strong>Visual Data Science</strong>, analyzing whether simple, interpretable text features differ systematically between real and fake news. The goal is to characterize stylistic patterns such as sensationalism, simple phrasing, or headline mismatches.
+                    </p>
+                </div>
+
+                <div>
+                    <h3 style="color: #1e293b; margin-bottom: 12px;">2. Feature Engineering</h3>
+                    <p style="color: #475569; line-height: 1.6; margin-bottom: 8px; font-size: 14px;">
+                        Raw text was manipulated into numerical features to quantify linguistic framing:
+                    </p>
+                    <ul style="color: #475569; font-size: 14px; padding-left: 20px; line-height: 1.6;">
+                        <li><strong>Structure:</strong> Character lengths, sentence counts, and lexical diversity (Type-Token Ratio).</li>
+                        <li><strong>"Shouting" & Punctuation:</strong> Normalized counts of exclamations, question marks, and uppercase text ratios per 1,000 characters.</li>
+                        <li><strong>Phrasing:</strong> Lexicon-based density of clickbait and hedging words.</li>
+                        <li><strong>Coherence:</strong> Title-Body alignment measured via Jaccard similarity of top keywords.</li>
+                        <li><strong>Sentiment:</strong> VADER compound scores for emotional tone analysis.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div style="text-align: center; margin-top: 40px; padding-bottom: 20px; color: #64748b; font-size: 14px;">
+            <p style="margin-bottom: 8px; font-weight: 500;">
+                By <strong>Pitic Emanuel</strong> (e12505717)
+            </p>
+            <p>
+                186.868 Visual Data Science (2025W) • TU Wien
+            </p>
         </div>
     </div>
 
@@ -439,7 +503,6 @@
             });
 
             // Chart 2: Distribution
-            // Chart 2: Distribution (with zoom/pan enabled)
             charts.chart2 = new Chart(document.getElementById('chart2'), {
                 type: 'bar',
                 data: { labels: [], datasets: [] },
@@ -449,7 +512,6 @@
                     plugins: {
                         legend: { position: 'top' },
                         datalabels: { display: false },
-                        // default zoom config for chart2 (can be specialized later per-plot)
                         zoom: {
                             zoom: {
                                 wheel: { enabled: true },
@@ -468,14 +530,6 @@
                     }
                 }
             });
-
-            // Double-click the distribution canvas to reset zoom
-            document.getElementById('chart2').addEventListener('dblclick', () => {
-                if (charts.chart2 && typeof charts.chart2.resetZoom === 'function') {
-                    charts.chart2.resetZoom();
-                }
-            });
-
 
             // Chart 3: Scatter
             charts.chart3 = new Chart(document.getElementById('chart3'), {
@@ -540,7 +594,95 @@
                 }
             });
 
+            initDuplicationChart();
             updateCharts();
+        }
+
+        // NEW: Function to render the Duplication Chart
+        function initDuplicationChart() {
+            const ctx = document.getElementById('duplicationChart');
+            charts.duplicationChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Fake News', 'Real News'],
+                    datasets: [
+                        {
+                            label: 'Fake: Unique',
+                            data: [53.3, null], 
+                            backgroundColor: '#ef5350', // Vibrant Red
+                            barThickness: 50,
+                            stack: 'stack1'
+                        },
+                        {
+                            label: 'Fake: Duplicates',
+                            data: [46.7, null],
+                            backgroundColor: '#b71c1c', // Dark Red
+                            barThickness: 50,
+                            stack: 'stack1'
+                        },
+                        {
+                            label: 'Real: Unique',
+                            data: [null, 94.7],
+                            backgroundColor: '#4fc3f7', // Vibrant Blue
+                            barThickness: 50,
+                            stack: 'stack1'
+                        },
+                        {
+                            label: 'Real: Duplicates',
+                            data: [null, 5.3],
+                            backgroundColor: '#01579b', // Dark Blue
+                            barThickness: 50,
+                            stack: 'stack1'
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y', // Horizontal Bar
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            max: 100,
+                            title: { display: true, text: 'Percentage of Dataset (%)' }
+                        },
+                        y: {
+                            stacked: true,
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Dataset Duplication Analysis',
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            position: 'bottom'
+                        },
+                        datalabels: {
+                            color: 'white',
+                            font: { weight: 'bold' },
+                            formatter: (value, context) => {
+                                // Don't show label if value is null or 0
+                                if(value === null || value === 0) return '';
+                                return value + '%';
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterBody: (context) => {
+                                    const index = context[0].dataIndex;
+                                    // Static totals for reference
+                                    const total = index === 0 ? 23481 : 21417; 
+                                    return `Total Samples: ${total.toLocaleString()}`;
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [ChartDataLabels]
+            });
         }
 
         function updateCharts() {
@@ -660,6 +802,63 @@
             };
             
             charts.chart4.update('none');
+
+            // Update Duplication Chart (Hide datasets based on filter)
+            if (charts.duplicationChart) {
+                const fakeUnique = 53.3, fakeDup = 46.7;
+                const realUnique = 94.7, realDup = 5.3;
+                
+                // We have 4 datasets in this specific order:
+                // 0: Fake Unique
+                // 1: Fake Dup
+                // 2: Real Unique
+                // 3: Real Dup
+                
+                if (selectedLabel === 'All') {
+                    // Show all rows, so we need labels for both
+                    charts.duplicationChart.data.labels = ['Fake News', 'Real News'];
+                    
+                    // Reset data visibility
+                    charts.duplicationChart.data.datasets[0].hidden = false;
+                    charts.duplicationChart.data.datasets[1].hidden = false;
+                    charts.duplicationChart.data.datasets[2].hidden = false;
+                    charts.duplicationChart.data.datasets[3].hidden = false;
+
+                    // Ensure data mapping is correct (fake on row 0, real on row 1)
+                    charts.duplicationChart.data.datasets[0].data = [fakeUnique, null];
+                    charts.duplicationChart.data.datasets[1].data = [fakeDup, null];
+                    charts.duplicationChart.data.datasets[2].data = [null, realUnique];
+                    charts.duplicationChart.data.datasets[3].data = [null, realDup];
+                    
+                } else if (selectedLabel === 'Fake') {
+                    charts.duplicationChart.data.labels = ['Fake News'];
+                    
+                    // Hide Real datasets
+                    charts.duplicationChart.data.datasets[0].hidden = false;
+                    charts.duplicationChart.data.datasets[1].hidden = false;
+                    charts.duplicationChart.data.datasets[2].hidden = true;
+                    charts.duplicationChart.data.datasets[3].hidden = true;
+                    
+                    // Fake data on row 0
+                    charts.duplicationChart.data.datasets[0].data = [fakeUnique];
+                    charts.duplicationChart.data.datasets[1].data = [fakeDup];
+                    
+                } else if (selectedLabel === 'Real') {
+                    charts.duplicationChart.data.labels = ['Real News'];
+                    
+                    // Hide Fake datasets
+                    charts.duplicationChart.data.datasets[0].hidden = true;
+                    charts.duplicationChart.data.datasets[1].hidden = true;
+                    charts.duplicationChart.data.datasets[2].hidden = false;
+                    charts.duplicationChart.data.datasets[3].hidden = false;
+                    
+                    // Real data on row 0 (since it's the only row now)
+                    charts.duplicationChart.data.datasets[2].data = [realUnique];
+                    charts.duplicationChart.data.datasets[3].data = [realDup];
+                }
+                
+                charts.duplicationChart.update();
+            }
         }
 
         function updateBarChart(fakeData, realData, feature) {
