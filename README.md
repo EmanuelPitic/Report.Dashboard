@@ -62,3 +62,6 @@ To run locally (due to CORS policies on local file access):
 * Stylistics: Fake news relies heavily on "clickbait" tactics: high uppercase ratios in titles, excessive punctuation, and emotional/polarizing language.
 * Complexity: Real news typically features longer body text, higher lexical diversity, and more "hedge words" (journalistic caution).
 
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
