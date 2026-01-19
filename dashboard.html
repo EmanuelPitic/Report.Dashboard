@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake News Detection Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1e293b; font-size: 32px; margin-bottom: 8px; }
+        .subtitle { color: #64748b; font-size: 16px; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 20px; }
+        .stat-card {
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .stat-card.blue { background: #dbeafe; border-color: #3b82f6; }
+        .stat-card.orange { background: #fed7aa; border-color: #f97316; }
+        .stat-card.green { background: #d1fae5; border-color: #10b981; }
+        .stat-card.purple { background: #e9d5ff; border-color: #a855f7; }
+        .stat-label { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        .stat-value { font-size: 24px; font-weight: bold; }
+        .blue .stat-label { color: #1e40af; }
+        .blue .stat-value { color: #1e3a8a; }
+        .orange .stat-label { color: #c2410c; }
+        .orange .stat-value { color: #9a3412; }
+        .green .stat-label { color: #047857; }
+        .green .stat-value { color: #065f46; }
+        .purple .stat-label { color: #7e22ce; }
+        .purple .stat-value { color: #6b21a8; }
+        .filters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .filter-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #475569;
+            margin-bottom: 8px;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+        select:focus { outline: none; border-color: #3b82f6; }
+        .chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .chart-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; }
+        .chart-card.tall { min-height: 450px; }
+        .chart-title { font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 8px; }
+        .chart-subtitle { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+        canvas { max-height: 300px; }
+        .chart-card.tall canvas { max-height: 400px; }
+        .legend { display: flex; justify-content: center; gap: 20px; margin-top: 12px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-color { width: 12px; height: 12px; border-radius: 2px; }
+        .findings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; font-size: 12px; color: #475569; }
+        .findings strong { color: #1e293b; }
+        h2 { font-size: 18px; color: #1e293b; margin-bottom: 16px; }
+        h3 { font-size: 14px; color: #475569; margin-bottom: 12px; font-weight: 600; }
+        
+        .download-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background 0.2s;
+            z-index: 10;
+        }
+        .download-btn:hover { background: #2563eb; }
+        .download-btn:active { background: #1d4ed8; }
+        
+        @keyframes highlight {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .highlight-chart {
+            animation: highlight 1s ease-out;
+            border: 2px solid #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Fake News Detection: Data Insights Dashboard</h1>
+            <p class="subtitle">Interactive analysis of linguistic patterns in fake vs. real news articles (ISOT Dataset)</p>
+            
+            <div class="stats-grid">
+                <div class="stat-card blue">
+                    <div class="stat-label">Total Articles</div>
+                    <div class="stat-value" id="stat-total">Loading...</div>
+                </div>
+                <div class="stat-card orange">
+                    <div class="stat-label">Fake News</div>
+                    <div class="stat-value" id="stat-fake">Loading...</div>
+                </div>
+                <div class="stat-card green">
+                    <div class="stat-label">Real News</div>
+                    <div class="stat-value" id="stat-real">Loading...</div>
+                </div>
+                <div class="stat-card purple">
+                    <div class="stat-label">Features Analyzed</div>
+                    <div class="stat-value">15+</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Interactive Filters</h2>
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Article Type</label>
+                    <select id="labelFilter">
+                        <option value="All">All Articles</option>
+                        <option value="Fake">Fake News Only</option>
+                        <option value="Real">Real News Only</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Feature to Analyze</label>
+                    <select id="featureSelect">
+                        <option value="upper_t">Uppercase Ratio (Title)</option>
+                        <option value="qmarks_per_1k">Question Marks (per 1k)</option>
+                        <option value="title_len">Title Length</option>
+                        <option value="avg_word_len_t">Avg Word Length (Title)</option>
+                        <option value="body_len">Body Length</option>
+                        <option value="pronouns_per_1k">Pronouns (per 1k chars)</option>
+                        <option value="desc_per_1k">Description Density (per 1k)</option>
+                        <option value="ellipsis_per_1k">Ellipses (per 1k)</option>
+                        <option value="exclam_t">Exclamations (Title)</option>
+                        <option value="stopword_pct_t">Stopword % (Title)</option>
+                        <option value="quote_b">Quote Count (Body)</option>
+                        <option value="avg_word_len_b">Avg Word Length (Body)</option>
+                        <option value="hedge_per_1k_chars">Hedge Words (per 1k)</option>
+                        <option value="n_sentences">Sentence Count</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Distribution Plot Type</label>
+                    <select id="plotTypeSelect">
+                        <option value="bar">Bar Chart (Histogram)</option>
+                        <option value="violin">Violin Plot</option>
+                        <option value="box">Box Plot</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-card">
+                <button class="download-btn" onclick="downloadChart('chart1', 'feature-importance.png')">Save plot</button>
+                <div class="chart-title">Model Feature Importance (Sorted by Impact)</div>
+                <div class="chart-subtitle">Click any bar (label on left) to update the distribution chart.</div>
+                <canvas id="chart1"></canvas>
+            </div>
+
+            <div class="chart-card" id="distCard">
+                <button class="download-btn" onclick="downloadChart('chart2', 'feature-distribution.png')">Save plot</button>
+                <div class="chart-title">Feature Distribution</div>
+                <div class="chart-subtitle" id="distributionTitle">Comparing Fake vs Real News</div>
+                <canvas id="chart2"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <button class="download-btn" onclick="downloadChart('chart3', 'scatter-plot.png')">Save plot</button>
+                <div class="chart-title">"Shouting" vs "Us vs Them"</div>
+                <div class="chart-subtitle">Uppercase ratio in titles vs. pronoun usage</div>
+                <canvas id="chart3"></canvas>
+            </div>
+
+            <div class="chart-card tall">
+                <button class="download-btn" onclick="downloadChart('chart4', 'sentiment-density.png')">Save plot</button>
+                <div class="chart-title">Insight: Emotional Tone (Sentiment Density)</div>
+                <div class="chart-subtitle">VADER sentiment distribution with median lines (scroll to zoom, drag to pan)</div>
+                <canvas id="chart4"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Key Findings:</h3>
+            <div class="findings">
+                <div>
+                    <strong>Fake news characteristics:</strong> Higher uppercase in titles (clickbait), more pronouns ("us vs them"), more question marks and emotional language.
+                </div>
+                <div>
+                    <strong>Real news characteristics:</strong> Longer body text, more hedge words (journalistic caution), better title-body coherence, longer average words.
+                </div>
+                <div>
+                    <strong>Brushing & Linking:</strong> Click on the "Model Feature Importance" bars to automatically update the "Feature Distribution" chart to explore that specific feature.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+        let charts = {};
+
+        // Download chart as image
+        function downloadChart(chartId, filename) {
+            const canvas = document.getElementById(chartId);
+            const url = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = url;
+            link.click();
+        }
+
+        // Calculate KDE (Kernel Density Estimation)
+        function calculateKDE(data, points = 100, bandwidth = 0.1) {
+            if (data.length === 0) return { x: [], y: [] };
+            
+            const min = -1;
+            const max = 1;
+            const step = (max - min) / points;
+            const x = [];
+            const y = [];
+            
+            for (let i = 0; i <= points; i++) {
+                const xi = min + i * step;
+                x.push(xi);
+                
+                let density = 0;
+                for (const val of data) {
+                    const diff = (xi - val) / bandwidth;
+                    density += Math.exp(-0.5 * diff * diff);
+                }
+                y.push(density / (data.length * bandwidth * Math.sqrt(2 * Math.PI)));
+            }
+            
+            return { x, y };
+        }
+
+        // Calculate median
+        function median(values) {
+            if (values.length === 0) return 0;
+            const sorted = [...values].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 === 0 
+                ? (sorted[mid - 1] + sorted[mid]) / 2 
+                : sorted[mid];
+        }
+
+        // Calculate quartiles
+        function quartiles(values) {
+            if (values.length === 0) return { q1: 0, q2: 0, q3: 0, min: 0, max: 0 };
+            const sorted = [...values].sort((a, b) => a - b);
+            const q1 = sorted[Math.floor(sorted.length * 0.25)];
+            const q2 = median(values);
+            const q3 = sorted[Math.floor(sorted.length * 0.75)];
+            return { q1, q2, q3, min: sorted[0], max: sorted[sorted.length - 1] };
+        }
+
+        // Remove outliers using IQR method
+        function removeOutliers(data, key) {
+            const values = data.map(d => d[key]).sort((a, b) => a - b);
+            const q1 = values[Math.floor(values.length * 0.25)];
+            const q3 = values[Math.floor(values.length * 0.75)];
+            const iqr = q3 - q1;
+            
+            if (iqr === 0) return data;
+
+            const lowerBound = q1 - 1.5 * iqr;
+            const upperBound = q3 + 1.5 * iqr;
+            return data.filter(d => d[key] >= lowerBound && d[key] <= upperBound);
+        }
+
+        // Load CSV data
+        async function loadData() {
+            try {
+                const response = await fetch('./out_isot/isot_per_article_features.csv');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const csvText = await response.text();
+                
+                const lines = csvText.split('\n');
+                const headers = lines[0].split(',');
+                
+                const getIndex = (name) => {
+                    const idx = headers.findIndex(h => h.trim().toLowerCase() === name.toLowerCase());
+                    if (idx === -1) console.warn(`Column '${name}' not found in CSV`);
+                    return idx;
+                };
+                
+                console.log('CSV Headers:', headers);
+                
+                const labelIdx = getIndex('label');
+                const upperIdx = getIndex('upper_t');
+                const pronounIdx = getIndex('pronouns_per_1k');
+                const qmarkIdx = getIndex('qmarks_per_1k');
+                const hedgeIdx = getIndex('hedge_per_1k_chars');
+                const jaccardIdx = getIndex('jaccard_topk');
+                const bodyLenIdx = getIndex('body_len');
+                const avgWordIdx = getIndex('avg_word_len_b');
+                const titleLenIdx = getIndex('title_len');
+                const avgWordTIdx = getIndex('avg_word_len_t');
+                const descIdx = getIndex('desc_per_1k');
+                const ellipsisIdx = getIndex('ellipsis_per_1k');
+                const exclamTIdx = getIndex('exclam_t');
+                const stopwordTIdx = getIndex('stopword_pct_t');
+                const sentencesIdx = getIndex('n_sentences');
+                const quoteBIdx = getIndex('quote_b');
+                const sentBodyIdx = getIndex('sent_body');
+                
+                for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    const cols = lines[i].split(',');
+                    
+                    if (labelIdx === -1 || cols.length < headers.length) continue;
+                    
+                    allData.push({
+                        id: i - 1,
+                        label: cols[labelIdx] === 'fake' ? 'Fake' : 'Real',
+                        upper_t: parseFloat(cols[upperIdx]) || 0,
+                        pronouns_per_1k: parseFloat(cols[pronounIdx]) || 0,
+                        qmarks_per_1k: parseFloat(cols[qmarkIdx]) || 0,
+                        hedge_per_1k_chars: parseFloat(cols[hedgeIdx]) || 0,
+                        jaccard_topk: parseFloat(cols[jaccardIdx]) || 0,
+                        body_len: parseFloat(cols[bodyLenIdx]) || 0,
+                        avg_word_len_b: parseFloat(cols[avgWordIdx]) || 0,
+                        title_len: parseFloat(cols[titleLenIdx]) || 0,
+                        avg_word_len_t: parseFloat(cols[avgWordTIdx]) || 0,
+                        desc_per_1k: parseFloat(cols[descIdx]) || 0,
+                        ellipsis_per_1k: ellipsisIdx !== -1 ? (parseFloat(cols[ellipsisIdx]) || 0) : 0,
+                        exclam_t: exclamTIdx !== -1 ? (parseFloat(cols[exclamTIdx]) || 0) : 0,
+                        stopword_pct_t: stopwordTIdx !== -1 ? (parseFloat(cols[stopwordTIdx]) || 0) : 0,
+                        n_sentences: parseFloat(cols[sentencesIdx]) || 0,
+                        quote_b: parseFloat(cols[quoteBIdx]) || 0,
+                        sent_body: parseFloat(cols[sentBodyIdx]) || 0,
+                    });
+                }
+                
+                console.log(`Loaded ${allData.length} articles`);
+                initCharts();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Could not load data file. Make sure out_isot/isot_per_article_features.csv is accessible.');
+            }
+        }
+
+        const featureImportance = [
+            { feature: 'Uppercase Ratio (Title)', key: 'upper_t', weight: 12.357163 },
+            { feature: 'Quote Count (Body)', key: 'quote_b', weight: -2.971782 },
+            { feature: 'Question Marks (per 1k)', key: 'qmarks_per_1k', weight: 1.848869 },
+            { feature: 'Title Length', key: 'title_len', weight: 1.592458 },
+            { feature: 'Avg Word Length (Title)', key: 'avg_word_len_t', weight: 1.561921 },
+            { feature: 'Body Length', key: 'body_len', weight: 1.237968 },
+            { feature: 'Sentence Count', key: 'n_sentences', weight: -1.003716 },
+            { feature: 'Pronouns (per 1k)', key: 'pronouns_per_1k', weight: 0.887477 },
+            { feature: 'Exclamations (Title)', key: 'exclam_t', weight: 0.885443 },
+            { feature: 'Avg Word Length (Body)', key: 'avg_word_len_b', weight: -0.851959 },
+            { feature: 'Ellipses', key: 'ellipsis_per_1k', weight: -0.851441 },
+            { feature: 'Stopword % (Title)', key: 'stopword_pct_t', weight: 0.773717 },
+            { feature: 'Description Density', key: 'desc_per_1k', weight: 0.683592 },
+            { feature: 'Hedge Words (per 1k)', key: 'hedge_per_1k_chars', weight: -0.261153 },
+        ].sort((a, b) => b.weight - a.weight);
+
+        function initCharts() {
+            // Chart 1: Feature Importance
+            charts.chart1 = new Chart(document.getElementById('chart1'), {
+                type: 'bar',
+                data: {
+                    labels: featureImportance.map(d => d.feature),
+                    datasets: [{
+                        label: 'Weight',
+                        data: featureImportance.map(d => d.weight),
+                        backgroundColor: featureImportance.map(d => d.weight > 0 ? '#d55e00' : '#0072b2'),
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: { afterBody: () => 'Click to show distribution below' }
+                        },
+                        datalabels: { display: false }
+                    },
+                    scales: {
+                        x: { 
+                            title: { display: true, text: 'Model Weight (Standardized)' },
+                            grid: { color: '#e2e8f0' }
+                        },
+                        y: { ticks: { autoSkip: false, font: { size: 11 } } }
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const selectedKey = featureImportance[index].key;
+                            const dropdown = document.getElementById('featureSelect');
+                            
+                            const optionExists = [...dropdown.options].some(o => o.value === selectedKey);
+                            
+                            if (optionExists) {
+                                dropdown.value = selectedKey;
+                                updateCharts();
+                                const targetCard = document.getElementById('distCard');
+                                targetCard.classList.remove('highlight-chart');
+                                void targetCard.offsetWidth;
+                                targetCard.classList.add('highlight-chart');
+                            }
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                    }
+                }
+            });
+
+            // Chart 2: Distribution
+            // Chart 2: Distribution (with zoom/pan enabled)
+            charts.chart2 = new Chart(document.getElementById('chart2'), {
+                type: 'bar',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        datalabels: { display: false },
+                        // default zoom config for chart2 (can be specialized later per-plot)
+                        zoom: {
+                            zoom: {
+                                wheel: { enabled: true },
+                                pinch: { enabled: true },
+                                mode: 'xy',
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'xy',
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { title: { display: true, text: 'Count' }, min: 0 },
+                        x: { title: { display: true, text: 'Value Range' } }
+                    }
+                }
+            });
+
+            // Double-click the distribution canvas to reset zoom
+            document.getElementById('chart2').addEventListener('dblclick', () => {
+                if (charts.chart2 && typeof charts.chart2.resetZoom === 'function') {
+                    charts.chart2.resetZoom();
+                }
+            });
+
+
+            // Chart 3: Scatter
+            charts.chart3 = new Chart(document.getElementById('chart3'), {
+                type: 'scatter',
+                data: { datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: { 
+                        legend: { position: 'top' },
+                        datalabels: { display: false }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Uppercase Ratio (Title)' } },
+                        y: { title: { display: true, text: 'Pronouns per 1k chars' } }
+                    }
+                }
+            });
+
+            // Chart 4: Sentiment KDE
+            charts.chart4 = new Chart(document.getElementById('chart4'), {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: { 
+                        legend: { position: 'top' },
+                        annotation: { annotations: {} },
+                        datalabels: { display: false },
+                        zoom: {
+                            zoom: {
+                                wheel: { enabled: true },
+                                pinch: { enabled: true },
+                                mode: 'xy',
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'xy',
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            type: 'linear',
+                            title: { display: true, text: 'VADER Sentiment Score (-1.0 to +1.0)' },
+                            min: -1,
+                            max: 1,
+                            ticks: {
+                                stepSize: 0.25,
+                                callback: function(value) { return value.toFixed(2); }
+                            },
+                            grid: {
+                                color: (context) => context.tick.value === 0 ? '#94a3b8' : '#e2e8f0'
+                            }
+                        },
+                        y: { 
+                            title: { display: true, text: 'Density' }, 
+                            min: 0,
+                        }
+                    }
+                }
+            });
+
+            updateCharts();
+        }
+
+        function updateCharts() {
+            const selectedLabel = document.getElementById('labelFilter').value;
+            const selectedFeature = document.getElementById('featureSelect').value;
+            const plotType = document.getElementById('plotTypeSelect').value;
+            
+            let filtered = selectedLabel === 'All' ? allData : allData.filter(d => d.label === selectedLabel);
+            
+            const fake = filtered.filter(d => d.label === 'Fake');
+            const real = filtered.filter(d => d.label === 'Real');
+            document.getElementById('stat-total').textContent = filtered.length;
+            document.getElementById('stat-fake').textContent = `${fake.length} (${((fake.length/filtered.length)*100).toFixed(1)}%)`;
+            document.getElementById('stat-real').textContent = `${real.length} (${((real.length/filtered.length)*100).toFixed(1)}%)`;
+
+            const cleanedFake = removeOutliers(fake, selectedFeature);
+            const cleanedReal = removeOutliers(real, selectedFeature);
+
+            // Update Chart 2 based on plot type
+            if (plotType === 'bar') {
+                updateBarChart(cleanedFake, cleanedReal, selectedFeature);
+            } else if (plotType === 'violin') {
+                updateViolinPlot(cleanedFake, cleanedReal, selectedFeature);
+            } else if (plotType === 'box') {
+                updateBoxPlot(cleanedFake, cleanedReal, selectedFeature);
+            }
+
+            // Update Chart 3: Scatter
+            const scatterFake = removeOutliers(fake, 'upper_t').filter(d => d.pronouns_per_1k < 30);
+            const scatterReal = removeOutliers(real, 'upper_t').filter(d => d.pronouns_per_1k < 30);
+
+            charts.chart3.data.datasets = [
+                {
+                    label: 'Fake',
+                    data: scatterFake.map(d => ({ x: d.upper_t, y: d.pronouns_per_1k })),
+                    backgroundColor: 'rgba(204, 0, 0, 0.5)',
+                    pointRadius: 3,
+                },
+                {
+                    label: 'Real',
+                    data: scatterReal.map(d => ({ x: d.upper_t, y: d.pronouns_per_1k })),
+                    backgroundColor: 'rgba(0, 114, 178, 0.5)',
+                    pointRadius: 3,
+                }
+            ];
+            charts.chart3.update('none');
+
+            // Update Chart 4: Sentiment KDE
+            const fakeSentiments = fake.map(d => d.sent_body).filter(s => !isNaN(s) && s >= -1 && s <= 1);
+            const realSentiments = real.map(d => d.sent_body).filter(s => !isNaN(s) && s >= -1 && s <= 1);
+            
+            const fakeKDE = calculateKDE(fakeSentiments, 100, 0.15);
+            const realKDE = calculateKDE(realSentiments, 100, 0.15);
+            
+            const fakeMedian = median(fakeSentiments);
+            const realMedian = median(realSentiments);
+            
+            const fakePoints = fakeKDE.x.map((x, i) => ({ x: x, y: fakeKDE.y[i] }));
+            const realPoints = realKDE.x.map((x, i) => ({ x: x, y: realKDE.y[i] }));
+            
+            charts.chart4.data.datasets = [
+                {
+                    label: 'Fake News',
+                    data: fakePoints,
+                    borderColor: '#CC0000',
+                    backgroundColor: 'rgba(204, 0, 0, 0.15)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Real News',
+                    data: realPoints,
+                    borderColor: '#0072b2',
+                    backgroundColor: 'rgba(0, 114, 178, 0.15)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0
+                }
+            ];
+            
+            charts.chart4.options.plugins.annotation = {
+                annotations: {
+                    negativeLabel: {
+                        type: 'label', xValue: -0.7, yValue: 0.05,
+                        content: ['Negative Bias'], color: '#CC6666',
+                        font: { size: 12, weight: 'normal' }
+                    },
+                    positiveLabel: {
+                        type: 'label', xValue: 0.7, yValue: 0.05,
+                        content: ['Positive Bias'], color: '#6699CC',
+                        font: { size: 12, weight: 'normal' }
+                    },
+                    fakeMedian: {
+                        type: 'line', xMin: fakeMedian, xMax: fakeMedian, yMin: 0, 
+                        yMax: 'max',
+                        borderColor: '#CC0000', borderWidth: 2.5, borderDash: [8, 4],
+                        label: {
+                            display: true, content: `Median: ${fakeMedian.toFixed(2)}`,
+                            position: 'start', backgroundColor: 'rgba(204, 0, 0, 0.9)',
+                            color: 'white', font: { size: 11, weight: 'bold' }, padding: 4
+                        }
+                    },
+                    realMedian: {
+                        type: 'line', xMin: realMedian, xMax: realMedian, yMin: 0,
+                        yMax: 'max',
+                        borderColor: '#0072b2', borderWidth: 2.5, borderDash: [8, 4],
+                        label: {
+                            display: true, content: `Median: ${realMedian.toFixed(2)}`,
+                            position: 'end', backgroundColor: 'rgba(0, 114, 178, 0.9)',
+                            color: 'white', font: { size: 11, weight: 'bold' }, padding: 4
+                        }
+                    }
+                }
+            };
+            
+            charts.chart4.update('none');
+        }
+
+        function updateBarChart(fakeData, realData, feature) {
+            const bins = 20;
+            const allValues = [...fakeData, ...realData].map(d => d[feature]);
+            if (allValues.length === 0) {
+                charts.chart2.data.labels = [];
+                charts.chart2.data.datasets = [];
+                charts.chart2.update('none');
+                return;
+            }
+
+            const min = Math.min(...allValues);
+            const max = Math.max(...allValues);
+            const binSize = (max - min) / bins;
+
+            const distLabels = [];
+            const fakeCounts = [];
+            const realCounts = [];
+
+            for (let i = 0; i < bins; i++) {
+                const binStart = min + i * binSize;
+                const binEnd = binStart + binSize;
+                const binMid = (binStart + binEnd) / 2;
+
+                distLabels.push(binMid.toFixed(2));
+                fakeCounts.push(fakeData.filter(d => d[feature] >= binStart && d[feature] < binEnd).length);
+                realCounts.push(realData.filter(d => d[feature] >= binStart && d[feature] < binEnd).length);
+            }
+
+            charts.chart2.config.type = 'bar';
+            charts.chart2.data.labels = distLabels;
+            charts.chart2.data.datasets = [
+                {
+                    label: 'Fake',
+                    data: fakeCounts,
+                    backgroundColor: '#CC0000',
+                },
+                {
+                    label: 'Real',
+                    data: realCounts,
+                    backgroundColor: '#0072b2',
+                }
+            ];
+
+            charts.chart2.options.scales = {
+                y: { title: { display: true, text: 'Count' }, min: 0 },
+                x: { title: { display: true, text: 'Value Range' } }
+            };
+
+            // For bar histogram: limit zoom/pan to x-axis (so user can zoom horizontally over bins)
+            charts.chart2.options.plugins.zoom = {
+                zoom: {
+                    wheel: { enabled: true },
+                    pinch: { enabled: true },
+                    mode: 'x',
+                },
+                pan: {
+                    enabled: true,
+                    mode: 'x',
+                }
+            };
+
+            charts.chart2.update('none');
+        }
+
+
+        function updateViolinPlot(fakeData, realData, feature) {
+            const fakeValues = fakeData.map(d => d[feature]).sort((a, b) => a - b);
+            const realValues = realData.map(d => d[feature]).sort((a, b) => a - b);
+            
+            const allValues = [...fakeValues, ...realValues];
+            if (allValues.length === 0) return;
+
+            const min = Math.min(...allValues);
+            const max = Math.max(...allValues);
+            
+            // Fix: Add padding so tails aren't cut off
+            const range = max - min || 1; 
+            const bandwidth = range / 20;
+            const padding = bandwidth * 4; 
+            
+            const renderMin = min - padding;
+            const renderMax = max + padding;
+            const renderRange = renderMax - renderMin;
+
+            const points = 100;
+            const step = renderRange / points;
+            
+            // Calculate KDE for both
+            const fakeKDE = [];
+            const realKDE = [];
+            const yValues = [];
+            
+            for (let i = 0; i <= points; i++) {
+                const y = renderMin + i * step;
+                yValues.push(y);
+                
+                let fakeDensity = 0;
+                for (const val of fakeValues) {
+                    const diff = (y - val) / bandwidth;
+                    fakeDensity += Math.exp(-0.5 * diff * diff);
+                }
+                fakeDensity = fakeDensity / (fakeValues.length * bandwidth * Math.sqrt(2 * Math.PI));
+                fakeKDE.push(fakeDensity);
+                
+                let realDensity = 0;
+                for (const val of realValues) {
+                    const diff = (y - val) / bandwidth;
+                    realDensity += Math.exp(-0.5 * diff * diff);
+                }
+                realDensity = realDensity / (realValues.length * bandwidth * Math.sqrt(2 * Math.PI));
+                realKDE.push(realDensity);
+            }
+            
+            // Normalize width
+            const maxFakeDensity = Math.max(...fakeKDE) || 1;
+            const maxRealDensity = Math.max(...realKDE) || 1;
+            const normalizedFakeKDE = fakeKDE.map(d => d / maxFakeDensity * 0.4);
+            const normalizedRealKDE = realKDE.map(d => d / maxRealDensity * 0.4);
+            
+            const fakeStats = quartiles(fakeValues);
+            const realStats = quartiles(realValues);
+            
+            // Create datasets
+            const fakeLeftViolin = yValues.map((y, i) => ({ x: 0.5 - normalizedFakeKDE[i], y }));
+            const fakeRightViolin = [...yValues].reverse().map((y, i) => ({ x: 0.5 + normalizedFakeKDE[points - i], y }));
+            
+            const realLeftViolin = yValues.map((y, i) => ({ x: 1.5 - normalizedRealKDE[i], y }));
+            const realRightViolin = [...yValues].reverse().map((y, i) => ({ x: 1.5 + normalizedRealKDE[points - i], y }));
+            
+            charts.chart2.config.type = 'scatter';
+            charts.chart2.data.datasets = [
+                // 0. Fake violin outline (UPDATED COLOR)
+                {
+                    label: 'Fake Distribution',
+                    data: [...fakeLeftViolin, ...fakeRightViolin],
+                    borderColor: '#CC0000',
+                    // Lighter red matching VADER chart (0.15 opacity)
+                    backgroundColor: 'rgba(204, 0, 0, 0.15)', 
+                    showLine: true,
+                    fill: true,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    hoverRadius: 0
+                },
+                // 1. Real violin outline (UPDATED COLOR)
+                {
+                    label: 'Real Distribution',
+                    data: [...realLeftViolin, ...realRightViolin],
+                    borderColor: '#0072b2',
+                    // Lighter blue matching VADER chart (0.15 opacity)
+                    backgroundColor: 'rgba(0, 114, 178, 0.15)',
+                    showLine: true,
+                    fill: true,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    hoverRadius: 0
+                },
+                // 2. Fake box (Internal - keeping dark for contrast)
+                {
+                    label: 'Fake IQR',
+                    data: [
+                        { x: 0.45, y: fakeStats.q1 },
+                        { x: 0.55, y: fakeStats.q1 },
+                        { x: 0.55, y: fakeStats.q3 },
+                        { x: 0.45, y: fakeStats.q3 },
+                        { x: 0.45, y: fakeStats.q1 }
+                    ],
+                    borderColor: '#8B0000',
+                    backgroundColor: 'rgba(139, 0, 0, 0.8)',
+                    showLine: true,
+                    fill: true,
+                    pointRadius: 0,
+                    borderWidth: 1
+                },
+                // 3. Fake Median Line (INTERACTIVE)
+                {
+                    label: 'Median',
+                    data: [{ x: 0.4, y: fakeStats.q2 }, { x: 0.5, y: fakeStats.q2 }, { x: 0.6, y: fakeStats.q2 }],
+                    borderColor: 'white',
+                    showLine: true,
+                    pointRadius: 0,
+                    pointHitRadius: 15,
+                    pointHoverRadius: 5,
+                    pointHoverBackgroundColor: 'white',
+                    borderWidth: 2
+                },
+                // 4. Real box (Internal - keeping dark for contrast)
+                {
+                    label: 'Real IQR',
+                    data: [
+                        { x: 1.45, y: realStats.q1 },
+                        { x: 1.55, y: realStats.q1 },
+                        { x: 1.55, y: realStats.q3 },
+                        { x: 1.45, y: realStats.q3 },
+                        { x: 1.45, y: realStats.q1 }
+                    ],
+                    borderColor: '#004d73',
+                    backgroundColor: 'rgba(0, 77, 115, 0.8)',
+                    showLine: true,
+                    fill: true,
+                    pointRadius: 0,
+                    borderWidth: 1
+                },
+                // 5. Real Median Line (INTERACTIVE)
+                {
+                    label: 'Median',
+                    data: [{ x: 1.4, y: realStats.q2 }, { x: 1.5, y: realStats.q2 }, { x: 1.6, y: realStats.q2 }],
+                    borderColor: 'white',
+                    showLine: true,
+                    pointRadius: 0,
+                    pointHitRadius: 15,
+                    pointHoverRadius: 5,
+                    pointHoverBackgroundColor: 'white',
+                    borderWidth: 2
+                }
+            ];
+            
+            // Updated Scales and Tooltips
+            charts.chart2.options.scales = {
+                x: { 
+                    type: 'linear', min: 0, max: 2,
+                    ticks: {
+                        callback: function(value) {
+                            if (value === 0.5) return 'Fake News';
+                            if (value === 1.5) return 'Real News';
+                            return '';
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: { 
+                    title: { display: true, text: 'Value' },
+                    min: renderMin,
+                    max: renderMax
+                }
+            };
+            
+            charts.chart2.options.plugins.legend = { display: false };
+            
+            // Custom Tooltip Logic
+            charts.chart2.options.plugins.tooltip = {
+                enabled: true,
+                mode: 'nearest',
+                intersect: true,
+                callbacks: {
+                    label: function(context) {
+                        const label = context.dataset.label || '';
+                        if (label === 'Median') {
+                            return `Median: ${context.parsed.y.toFixed(3)}`;
+                        } else if (label.includes('IQR')) {
+                            return `IQR Range: ${context.parsed.y.toFixed(3)}`;
+                        }
+                        return null;
+                    }
+                }
+            };
+            
+            charts.chart2.options.plugins.zoom = {
+                zoom: {
+                    wheel: { enabled: true },
+                    pinch: { enabled: true },
+                    mode: 'xy',
+                    // limits keep the user from zooming outside the meaningful area
+                    limits: {
+                        x: { min: 0, max: 2 },
+                        y: { min: renderMin, max: renderMax }
+                    }
+                },
+                pan: {
+                    enabled: true,
+                    mode: 'xy',
+                    // optional: clamp pan to the same limits
+                    rangeMin: { x: 0, y: renderMin },
+                    rangeMax: { x: 2, y: renderMax }
+                }
+            };
+
+            charts.chart2.update('none');
+        }
+
+
+        function updateBoxPlot(fakeData, realData, feature) {
+            const fakeValues = fakeData.map(d => d[feature]);
+            const realValues = realData.map(d => d[feature]);
+            
+            const fakeStats = quartiles(fakeValues);
+            const realStats = quartiles(realValues);
+            
+            const fakeIQR = fakeStats.q3 - fakeStats.q1;
+            const realIQR = realStats.q3 - realStats.q1;
+            
+            const fakeWhiskerLow = Math.max(fakeStats.min, fakeStats.q1 - 1.5 * fakeIQR);
+            const fakeWhiskerHigh = Math.min(fakeStats.max, fakeStats.q3 + 1.5 * fakeIQR);
+            const realWhiskerLow = Math.max(realStats.min, realStats.q1 - 1.5 * realIQR);
+            const realWhiskerHigh = Math.min(realStats.max, realStats.q3 + 1.5 * realIQR);
+            
+            // Outliers logic remains same
+            const fakeOutliers = fakeValues
+                .filter(v => v < fakeWhiskerLow || v > fakeWhiskerHigh)
+                .map(v => ({ x: 0.5, y: v }));
+            const realOutliers = realValues
+                .filter(v => v < realWhiskerLow || v > realWhiskerHigh)
+                .map(v => ({ x: 1.5, y: v }));
+            
+            charts.chart2.config.type = 'scatter';
+            charts.chart2.data.datasets = [
+                // Fake box
+                {
+                    label: 'Fake IQR',
+                    data: [
+                        { x: 0.3, y: fakeStats.q1 }, { x: 0.7, y: fakeStats.q1 },
+                        { x: 0.7, y: fakeStats.q3 }, { x: 0.3, y: fakeStats.q3 },
+                        { x: 0.3, y: fakeStats.q1 }
+                    ],
+                    borderColor: '#CC0000',
+                    backgroundColor: 'rgba(204, 0, 0, 0.3)',
+                    showLine: true,
+                    fill: true,
+                    pointRadius: 0,
+                    borderWidth: 2
+                },
+                // Fake Median (Interactive)
+                {
+                    label: 'Median',
+                    // Added middle point (0.5) for tooltip
+                    data: [{ x: 0.3, y: fakeStats.q2 }, { x: 0.5, y: fakeStats.q2 }, { x: 0.7, y: fakeStats.q2 }],
+                    borderColor: '#8B0000',
+                    showLine: true,
+                    pointRadius: 0,
+                    pointHitRadius: 20, // Easy to catch
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#8B0000',
+                    borderWidth: 3
+                },
+                // Fake Whiskers
+                {
+                    label: 'Whisker',
+                    data: [
+                        { x: 0.5, y: fakeWhiskerLow }, { x: 0.5, y: fakeStats.q1 },
+                        { x: NaN, y: NaN },
+                        { x: 0.5, y: fakeStats.q3 }, { x: 0.5, y: fakeWhiskerHigh },
+                        { x: NaN, y: NaN },
+                        { x: 0.4, y: fakeWhiskerLow }, { x: 0.6, y: fakeWhiskerLow },
+                        { x: NaN, y: NaN },
+                        { x: 0.4, y: fakeWhiskerHigh }, { x: 0.6, y: fakeWhiskerHigh }
+                    ],
+                    borderColor: '#CC0000',
+                    showLine: true,
+                    pointRadius: 0,
+                    borderWidth: 1.5
+                },
+                // Fake Outliers
+                ...(fakeOutliers.length > 0 ? [{
+                    label: 'Outlier',
+                    data: fakeOutliers,
+                    backgroundColor: '#CC0000',
+                    borderColor: '#CC0000',
+                    pointRadius: 3,
+                    pointStyle: 'circle'
+                }] : []),
+
+                // Real box
+                {
+                    label: 'Real IQR',
+                    data: [
+                        { x: 1.3, y: realStats.q1 }, { x: 1.7, y: realStats.q1 },
+                        { x: 1.7, y: realStats.q3 }, { x: 1.3, y: realStats.q3 },
+                        { x: 1.3, y: realStats.q1 }
+                    ],
+                    borderColor: '#0072b2',
+                    backgroundColor: 'rgba(0, 114, 178, 0.3)',
+                    showLine: true,
+                    fill: true,
+                    pointRadius: 0,
+                    borderWidth: 2
+                },
+                // Real Median (Interactive)
+                {
+                    label: 'Median',
+                    // Added middle point (1.5) for tooltip
+                    data: [{ x: 1.3, y: realStats.q2 }, { x: 1.5, y: realStats.q2 }, { x: 1.7, y: realStats.q2 }],
+                    borderColor: '#004d73',
+                    showLine: true,
+                    pointRadius: 0,
+                    pointHitRadius: 20, // Easy to catch
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#004d73',
+                    borderWidth: 3
+                },
+                // Real Whiskers
+                {
+                    label: 'Whisker',
+                    data: [
+                        { x: 1.5, y: realWhiskerLow }, { x: 1.5, y: realStats.q1 },
+                        { x: NaN, y: NaN },
+                        { x: 1.5, y: realStats.q3 }, { x: 1.5, y: realWhiskerHigh },
+                        { x: NaN, y: NaN },
+                        { x: 1.4, y: realWhiskerLow }, { x: 1.6, y: realWhiskerLow },
+                        { x: NaN, y: NaN },
+                        { x: 1.4, y: realWhiskerHigh }, { x: 1.6, y: realWhiskerHigh }
+                    ],
+                    borderColor: '#0072b2',
+                    showLine: true,
+                    pointRadius: 0,
+                    borderWidth: 1.5
+                },
+                // Real Outliers
+                ...(realOutliers.length > 0 ? [{
+                    label: 'Outlier',
+                    data: realOutliers,
+                    backgroundColor: '#0072b2',
+                    borderColor: '#0072b2',
+                    pointRadius: 3,
+                    pointStyle: 'circle'
+                }] : [])
+            ];
+            
+            charts.chart2.options.scales = {
+                x: { 
+                    type: 'linear', min: 0, max: 2,
+                    ticks: {
+                        callback: function(value) {
+                            if (value === 0.5) return 'Fake News';
+                            if (value === 1.5) return 'Real News';
+                            return '';
+                        }
+                    },
+                    grid: { display: false }
+                },
+                y: { title: { display: true, text: 'Value' }, min: undefined, max: undefined }
+            };
+            
+            // Apply tooltip logic
+            charts.chart2.options.plugins.tooltip = {
+                enabled: true,
+                mode: 'nearest',
+                intersect: true,
+                callbacks: {
+                    label: function(context) {
+                        const label = context.dataset.label || '';
+                        const val = context.parsed.y.toFixed(3);
+                        
+                        if (label === 'Median') return `Median: ${val}`;
+                        if (label === 'Outlier') return `Outlier: ${val}`;
+                        if (label === 'Fake IQR' || label === 'Real IQR') return `Q1/Q3 Limit: ${val}`;
+                        
+                        return null;
+                    }
+                }
+            };
+
+            const allVals = [...fakeValues, ...realValues];
+            const globalMin = allVals.length ? Math.min(...allVals) : 0;
+            const globalMax = allVals.length ? Math.max(...allVals) : 1;
+            const pad = (globalMax - globalMin) * 0.1 || 0.1; // small padding if constant data
+
+            charts.chart2.options.plugins.zoom = {
+                zoom: {
+                    wheel: { enabled: true },
+                    pinch: { enabled: true },
+                    mode: 'xy',
+                    limits: {
+                        x: { min: 0, max: 2 },
+                        y: { min: globalMin - pad, max: globalMax + pad }
+                    }
+                },
+                pan: {
+                    enabled: true,
+                    mode: 'xy',
+                    rangeMin: { x: 0, y: globalMin - pad },
+                    rangeMax: { x: 2, y: globalMax + pad }
+                }
+            };
+
+            charts.chart2.options.plugins.legend = { display: false };
+            charts.chart2.update('none');
+            
+            charts.chart2.options.plugins.legend = { display: false };
+            charts.chart2.update('none');
+        }
+
+        document.getElementById('labelFilter').addEventListener('change', updateCharts);
+        document.getElementById('featureSelect').addEventListener('change', updateCharts);
+        document.getElementById('plotTypeSelect').addEventListener('change', updateCharts);
+
+        window.addEventListener('load', loadData);
+    </script>
+</body>
+</html>
