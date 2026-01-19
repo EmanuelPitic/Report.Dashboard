@@ -1,8 +1,8 @@
 # Fake News Detection: Data Insights Dashboard
 
-*Course: 186.868 Visual Data Science (2025W), TU Wien 
-*Author: Pitic Emanuel (e12505717)
-*Live Demo: https://emanuelpitic.github.io/Report.Dashboard/index.html
+* Course: 186.868 Visual Data Science (2025W), TU Wien 
+* Author: Pitic Emanuel (e12505717)
+* Live Demo: https://emanuelpitic.github.io/Report.Dashboard/index.html
 
 ## Overview
 
