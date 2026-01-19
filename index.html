@@ -250,6 +250,19 @@
     </style>
 </head>
 <body>
+    <div id="loadingOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(248, 250, 252, 0.95); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+        <div style="text-align: center;">
+            <div style="width: 60px; height: 60px; border: 4px solid #e2e8f0; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+            <p style="color: #1e293b; font-size: 18px; font-weight: 600;">Loading Dashboard...</p>
+            <p style="color: #64748b; font-size: 14px; margin-top: 8px;">Processing 45,000 articles</p>
+        </div>
+    </div>
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
     <div class="container">
         <div class="card">
             <h1>Fake News Detection: Data Insights Dashboard</h1>
@@ -273,6 +286,21 @@
                     <div class="stat-value">15+</div>
                 </div>
             </div>
+        </div>
+
+        <div class="card">
+            <p style="color: #1e3a8a; margin: 0; font-size: clamp(12px, 2.8vw, 14px); line-height: 1.5;">
+                <strong>Filters:</strong>
+                <br>• <strong>Article Type:</strong> Filter all charts to show only Fake News, Real News, or both.
+                <br>• <strong>Feature to Analyze:</strong> Select which linguistic feature to display in the Distribution chart.
+                <br>• <strong>Distribution Plot Type:</strong> Switch between Bar Chart (histogram), Violin Plot (density shape), or Box Plot (quartiles) visualization styles.
+                <br><br>
+                <strong>Brushing & Linking:</strong>
+                <br>• Click <strong>any bar from the Model Feature Importance</strong> chart to automatically update the distribution chart with that feature.
+                <br>• Click on the <strong>Sentiment chart</strong> (left = negative, center = neutral, right = positive) to filter both the Scatter plot and Distribution chart to show only articles with that sentiment. A "Reset" button will appear in the top-right.
+                <br>• <strong>Draw a selection box</strong> on the Scatter plot (click and drag) to zoom in and update the Distribution chart with only the selected points. Click the "Reset" button to restore the full view.
+                <br>• All interactions work together: combine filters with sentiment selection and scatter brushing for comprehensive data exploration.
+            </p>
         </div>
 
         <div class="card">
@@ -334,9 +362,11 @@
                 <canvas id="chart2"></canvas>
             </div>
 
+
             <div class="chart-card">
                 <button class="download-btn" onclick="downloadChart('chart3', 'scatter-plot.png')">Save</button>
-                <div class="chart-title">"Shouting" vs "Us vs Them"</div>
+                <button class="download-btn" style="right: 60px;" onclick="clearScatterSelection()" id="clearScatterBtn">Reset</button>
+                <div class="chart-title" id="scatterTitle">"Shouting" vs "Us vs Them"</div>
                 <div class="chart-subtitle">Uppercase ratio in titles vs. pronoun usage</div>
                 <canvas id="chart3"></canvas>
             </div>
@@ -422,7 +452,49 @@
     <script>
         let allData = [];
         let charts = {};
+        let selectedSentimentRange = null; 
+        let scatterSelectedPoints = null;
 
+        let debounceTimer;
+        function debounce(func, delay) {
+            return function(...args) {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+
+        function handleScatterSelection(chart) {
+            const xAxis = chart.scales.x;
+            const yAxis = chart.scales.y;
+            
+            const xMin = xAxis.min;
+            const xMax = xAxis.max;
+            const yMin = yAxis.min;
+            const yMax = yAxis.max;
+            
+            const selectedLabel = document.getElementById('labelFilter').value;
+            let baseData = selectedLabel === 'All' ? allData : allData.filter(d => d.label === selectedLabel);
+            
+            if (selectedSentimentRange) {
+                if (selectedSentimentRange === 'negative') {
+                    baseData = baseData.filter(d => d.sent_body < -0.05);
+                } else if (selectedSentimentRange === 'positive') {
+                    baseData = baseData.filter(d => d.sent_body > 0.05);
+                } else if (selectedSentimentRange === 'neutral') {
+                    baseData = baseData.filter(d => d.sent_body >= -0.05 && d.sent_body <= 0.05);
+                }
+            }
+            
+            scatterSelectedPoints = baseData.filter(d => 
+                d.upper_t >= xMin && d.upper_t <= xMax &&
+                d.pronouns_per_1k >= yMin && d.pronouns_per_1k <= yMax &&
+                d.pronouns_per_1k < 30
+            );
+            
+            if (scatterSelectedPoints.length > 0 && scatterSelectedPoints.length < baseData.length) {
+                updateDistributionFromScatter(scatterSelectedPoints);
+            }
+        }
         // Download chart as image
         function downloadChart(chartId, filename) {
             const canvas = document.getElementById(chartId);
@@ -492,9 +564,128 @@
             return data.filter(d => d[key] >= lowerBound && d[key] <= upperBound);
         }
 
+        function filterScatterBySentiment(sentimentRange) {
+            selectedSentimentRange = sentimentRange;
+            
+            const selectedLabel = document.getElementById('labelFilter').value;
+            let filtered = selectedLabel === 'All' ? allData : allData.filter(d => d.label === selectedLabel);
+            
+            let filteredBySentiment;
+            if (sentimentRange === 'negative') {
+                filteredBySentiment = filtered.filter(d => d.sent_body < -0.05);
+            } else if (sentimentRange === 'positive') {
+                filteredBySentiment = filtered.filter(d => d.sent_body > 0.05);
+            } else if (sentimentRange === 'neutral') {
+                filteredBySentiment = filtered.filter(d => d.sent_body >= -0.05 && d.sent_body <= 0.05);
+            } else {
+                filteredBySentiment = filtered;
+            }
+            
+            const scatterFake = removeOutliers(filteredBySentiment.filter(d => d.label === 'Fake'), 'upper_t')
+                .filter(d => d.pronouns_per_1k < 30);
+            const scatterReal = removeOutliers(filteredBySentiment.filter(d => d.label === 'Real'), 'upper_t')
+                .filter(d => d.pronouns_per_1k < 30);
+            
+            charts.chart3.data.datasets = [
+                {
+                    label: 'Fake',
+                    data: scatterFake.map(d => ({ x: d.upper_t, y: d.pronouns_per_1k })),
+                    backgroundColor: sentimentRange ? 'rgba(204, 0, 0, 0.8)' : 'rgba(204, 0, 0, 0.5)',
+                    pointRadius: sentimentRange ? 4 : 3,
+                },
+                {
+                    label: 'Real',
+                    data: scatterReal.map(d => ({ x: d.upper_t, y: d.pronouns_per_1k })),
+                    backgroundColor: sentimentRange ? 'rgba(0, 114, 178, 0.8)' : 'rgba(0, 114, 178, 0.5)',
+                    pointRadius: sentimentRange ? 4 : 3,
+                }
+            ];
+            
+            const scatterTitle = document.querySelector('#chart3').parentElement.querySelector('.chart-title');
+            if (sentimentRange) {
+                scatterTitle.innerHTML = `"Shouting" vs "Us vs Them" <span style="color: #3b82f6; font-size: 14px;">(${sentimentRange.toUpperCase()} articles only)</span>`;
+            } else {
+                scatterTitle.textContent = '"Shouting" vs "Us vs Them"';
+            }
+            
+            charts.chart3.update('none');
+            const selectedFeature = document.getElementById('featureSelect').value;
+            const plotType = document.getElementById('plotTypeSelect').value;
+            
+            const fake = filteredBySentiment.filter(d => d.label === 'Fake');
+            const real = filteredBySentiment.filter(d => d.label === 'Real');
+            
+            const cleanedFake = removeOutliers(fake, selectedFeature);
+            const cleanedReal = removeOutliers(real, selectedFeature);
+            
+            if (plotType === 'bar') {
+                updateBarChart(cleanedFake, cleanedReal, selectedFeature);
+            } else if (plotType === 'violin') {
+                updateViolinPlot(cleanedFake, cleanedReal, selectedFeature);
+            } else if (plotType === 'box') {
+                updateBoxPlot(cleanedFake, cleanedReal, selectedFeature);
+            }
+            
+            // Update distribution title
+            const distTitle = document.getElementById('distributionTitle');
+            if (sentimentRange) {
+                distTitle.innerHTML = `Comparing Fake vs Real News <span style="color: #3b82f6; font-size: 12px;">(${sentimentRange.toUpperCase()} sentiment only)</span>`;
+            } else {
+                distTitle.textContent = 'Comparing Fake vs Real News';
+    }
+        }
+
+        function highlightSentimentRegion(region) {
+            const sentimentCard = document.querySelector('#chart4').parentElement;
+            const subtitle = sentimentCard.querySelector('.chart-subtitle');
+            
+            // Show/update the reset button
+            let resetBtn = sentimentCard.querySelector('#sentimentResetBtn');
+            if (!resetBtn) {
+                // Create button if it doesn't exist
+                resetBtn = document.createElement('button');
+                resetBtn.id = 'sentimentResetBtn';
+                resetBtn.className = 'download-btn';
+                resetBtn.style.right = '60px'; // Position next to Save button
+                resetBtn.textContent = 'Reset';
+                resetBtn.onclick = clearSentimentFilter;
+                sentimentCard.appendChild(resetBtn);
+            }
+            resetBtn.style.display = 'block';
+            
+            if (region === 'negative') {
+                subtitle.innerHTML = '<a href="https://pypi.org/project/vaderSentiment/">VADER</a> sentiment distribution with median lines (scroll to zoom, drag to pan) <span style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-weight: 600; margin-left: 8px;">NEGATIVE SELECTED</span>';
+            } else if (region === 'positive') {
+                subtitle.innerHTML = '<a href="https://pypi.org/project/vaderSentiment/">VADER</a> sentiment distribution with median lines (scroll to zoom, drag to pan) <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: 600; margin-left: 8px;">POSITIVE SELECTED</span>';
+            } else if (region === 'neutral') {
+                subtitle.innerHTML = '<a href="https://pypi.org/project/vaderSentiment/">VADER</a> sentiment distribution with median lines (scroll to zoom, drag to pan) <span style="background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-weight: 600; margin-left: 8px;">NEUTRAL SELECTED</span>';
+            }
+        }
+
+        function clearSentimentFilter() {
+            selectedSentimentRange = null;
+            filterScatterBySentiment(null);
+            
+            const sentimentCard = document.querySelector('#chart4').parentElement;
+            const subtitle = sentimentCard.querySelector('.chart-subtitle');
+            subtitle.innerHTML = '<a href="https://pypi.org/project/vaderSentiment/">VADER</a> sentiment distribution with median lines (scroll to zoom, drag to pan)';
+            
+            // Hide the reset button
+            const resetBtn = sentimentCard.querySelector('#sentimentResetBtn');
+            if (resetBtn) {
+                resetBtn.style.display = 'none';
+            }
+            
+            // Reset distribution title
+            document.getElementById('distributionTitle').textContent = 'Comparing Fake vs Real News';
+        }
+
         // Load CSV data
         async function loadData() {
             try {
+                // Show loading overlay
+                document.getElementById('loadingOverlay').style.display = 'flex';
+                
                 const response = await fetch('./out_isot/isot_per_article_features.csv');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -559,12 +750,30 @@
                 }
                 
                 console.log(`Loaded ${allData.length} articles`);
+                
+                // Hide loading overlay
+                document.getElementById('loadingOverlay').style.display = 'none';
+                
                 initCharts();
             } catch (error) {
                 console.error('Error loading data:', error);
-                alert('Could not load data file. Make sure out_isot/isot_per_article_features.csv is accessible.');
+                
+                // Show error message
+                document.getElementById('loadingOverlay').innerHTML = `
+                    <div style="text-align: center; max-width: 500px; padding: 30px;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">Error</div>
+                        <p style="color: #dc2626; font-size: 18px; font-weight: 600; margin-bottom: 10px;">Failed to Load Data</p>
+                        <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+                            Could not load the CSV file. Please ensure <code>out_isot/isot_per_article_features.csv</code> is accessible.
+                        </p>
+                        <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500;">
+                            Retry
+                        </button>
+                    </div>
+                `;
             }
         }
+
 
         const featureImportance = [
             { feature: 'Uppercase Ratio (Title)', key: 'upper_t', weight: 12.357163 },
@@ -673,9 +882,31 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
+                    animation: false, // Disable animations for better performance
                     plugins: { 
                         legend: { position: 'top' },
-                        datalabels: { display: false }
+                        datalabels: { display: false },
+                        zoom: {
+                            zoom: {
+                                drag: {
+                                    enabled: true,
+                                    borderColor: '#3b82f6',
+                                    borderWidth: 3,
+                                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                                },
+                                mode: 'xy',
+                                onZoomComplete: debounce(({ chart }) => {
+                                    handleScatterSelection(chart);
+                                }, 300) // Wait 300ms after user stops zooming
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'xy',
+                                onPanComplete: debounce(({ chart }) => {
+                                    handleScatterSelection(chart);
+                                }, 300) // Wait 300ms after user stops panning
+                            }
+                        }
                     },
                     scales: {
                         x: { title: { display: true, text: 'Uppercase Ratio (Title)' } },
@@ -683,6 +914,8 @@
                     }
                 }
             });
+
+
 
             // Chart 4: Sentiment KDE
             charts.chart4 = new Chart(document.getElementById('chart4'), {
@@ -725,14 +958,94 @@
                             title: { display: true, text: 'Density' }, 
                             min: 0,
                         }
+                    },
+                    onClick: (event, elements, chart) => {
+                        const canvasPosition = Chart.helpers.getRelativePosition(event, chart);
+                        const dataX = chart.scales.x.getValueForPixel(canvasPosition.x);
+                        
+                        if (dataX < -0.05) {
+                            filterScatterBySentiment('negative');
+                            highlightSentimentRegion('negative');
+                        } else if (dataX > 0.05) {
+                            filterScatterBySentiment('positive');
+                            highlightSentimentRegion('positive');
+                        } else {
+                            filterScatterBySentiment('neutral');
+                            highlightSentimentRegion('neutral');
+                        }
+                    },
+                    onHover: (event, elements, chart) => {
+                        event.native.target.style.cursor = 'pointer';
                     }
                 }
+            });
+
+            document.getElementById('chart4').addEventListener('dblclick', () => {
+                clearSentimentFilter();
             });
 
             initDuplicationChart();
             updateCharts();
         }
+        
 
+        function updateDistributionFromScatter(selectedPoints) {
+            const selectedFeature = document.getElementById('featureSelect').value;
+            const plotType = document.getElementById('plotTypeSelect').value;
+            
+            const fake = selectedPoints.filter(d => d.label === 'Fake');
+            const real = selectedPoints.filter(d => d.label === 'Real');
+            
+            const cleanedFake = removeOutliers(fake, selectedFeature);
+            const cleanedReal = removeOutliers(real, selectedFeature);
+            
+            if (plotType === 'bar') {
+                updateBarChart(cleanedFake, cleanedReal, selectedFeature);
+            } else if (plotType === 'violin') {
+                updateViolinPlot(cleanedFake, cleanedReal, selectedFeature);
+            } else if (plotType === 'box') {
+                updateBoxPlot(cleanedFake, cleanedReal, selectedFeature);
+            }
+            
+            charts.chart2.update('none');
+
+            // Update distribution title
+            const distTitle = document.getElementById('distributionTitle');
+            distTitle.innerHTML = `Comparing Fake vs Real News <span style="color: #3b82f6; font-size: 12px;">(${selectedPoints.length} selected from scatter)</span>`;
+            
+            // Update scatter title
+            const scatterTitle = document.getElementById('scatterTitle');
+            if (selectedSentimentRange) {
+                scatterTitle.innerHTML = `"Shouting" vs "Us vs Them" <span style="color: #3b82f6; font-size: 14px;">(${selectedSentimentRange.toUpperCase()} - ${selectedPoints.length} points selected)</span>`;
+            } else {
+                scatterTitle.innerHTML = `"Shouting" vs "Us vs Them" <span style="color: #3b82f6; font-size: 14px;">(${selectedPoints.length} points selected)</span>`;
+            }
+            
+            // Highlight the distribution card
+            const distCard = document.getElementById('distCard');
+            distCard.classList.remove('highlight-chart');
+            void distCard.offsetWidth; // Trigger reflow
+            distCard.classList.add('highlight-chart');
+        }
+
+        function clearScatterSelection() {
+            scatterSelectedPoints = null;
+            charts.chart3.resetZoom();
+            
+            // Reset scatter title
+            const scatterTitle = document.getElementById('scatterTitle');
+            if (selectedSentimentRange) {
+                scatterTitle.innerHTML = `"Shouting" vs "Us vs Them" <span style="color: #3b82f6; font-size: 14px;">(${selectedSentimentRange.toUpperCase()} articles only)</span>`;
+            } else {
+                scatterTitle.textContent = '"Shouting" vs "Us vs Them"';
+            }
+            
+            // Reset distribution title
+            document.getElementById('distributionTitle').textContent = 'Comparing Fake vs Real News';
+            
+            // Refresh all charts to original state
+            updateCharts();
+        }
 
         function initDuplicationChart() {
             const ctx = document.getElementById('duplicationChart');
@@ -1244,7 +1557,6 @@
                     }
                 }
             };
-            // -----------------------------------------
             
             // Standard Zoom options
             charts.chart2.options.plugins.zoom = {
