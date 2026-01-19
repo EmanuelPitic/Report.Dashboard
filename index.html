@@ -228,20 +228,12 @@
                 <canvas id="duplicationChart"></canvas>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
-                <div>
-                    <h3 style="color: #1e293b; margin-bottom: 12px;">1. Which insight did you identify regarding data quality?</h3>
+            <div>
+                <div style="text-align: center;">
                     <p style="color: #475569; line-height: 1.6; margin: 0; font-size: 14px;">
                         During the profiling stage, I identified a significant disparity in data redundancy. While <strong style="color: #0072b2;">Real News is relatively clean</strong>, the <strong style="color: #CC0000;">Fake News dataset is highly repetitive</strong>, containing <strong>46.7% duplicate entries</strong> (compared to only <strong>5.3% in Real News</strong>).
                         <br><br>
                         This suggests that Fake News sources often "recycle" content across platforms to create an echo chamber effect and artificially inflate credibility.
-                    </p>
-                </div>
-
-                <div>
-                    <h3 style="color: #1e293b; margin-bottom: 12px;">2. Why does this visualization best explain the issue?</h3>
-                    <p style="color: #475569; line-height: 1.6; margin: 0; font-size: 14px;">
-                        I selected a <strong>Stacked Horizontal Bar Chart</strong> because it allows for a direct comparison of composition rather than just raw volume. Since the total sample counts differ, a normalized 100% view highlights the proportion of wasted data.
                     </p>
                 </div>
             </div>
@@ -250,7 +242,7 @@
             <h2>Data Source & Methodology</h2>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
-                <div>https
+                <div>
                     <h3 style="color: #1e293b; margin-bottom: 12px;">1. <a href="https://www.kaggle.com/datasets/csmalarkodi/isot-fake-news-dataset">The ISOT Dataset</a></h3>
                     <p style="color: #475569; line-height: 1.6; margin: 0; font-size: 14px;">
                         This analysis utilizes the <strong>ISOT Fake News Dataset</strong> (University of Victoria), comprising approximately 45,000 articles split between <code>Fake.csv</code> and <code>True.csv</code>.
