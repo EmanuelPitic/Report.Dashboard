@@ -42,7 +42,7 @@ To run locally (due to CORS policies on local file access):
 1. Clone the repository.
 2. Run a local HTTP server in the project directory:
    
-   # Python 3
+   ### Python 3
    python -m http.server 8000
 
 3. Navigate to http://localhost:8000/index.html
